@@ -1,21 +1,7 @@
 name: Descargar Imágenes Docker
 
 on:
-  # Ejecutar manualmente desde la interfaz de GitHub
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Versión del comprimido (opcional)'
-        required: false
-        type: string
-  
-  # Opcional: Ejecutar en schedule (ejemplo: cada día a las 2am)
-  # schedule:
-  #   - cron: '0 2 * * *'
-
-  # Opcional: Ejecutar en push a main
-  # push:
-  #   branches: [ main ]
 
 jobs:
   descargar-imagenes:
@@ -25,49 +11,28 @@ jobs:
     - name: Checkout del repositorio
       uses: actions/checkout@v4
     
-    - name: Dar permisos de ejecución al script
-      run: chmod +x monitoring-images-pull.sh
-    
-    - name: Ejecutar script de descarga de imágenes
-      run: ./monitoring-images-pull.sh --save
-    
-    - name: Listar archivos generados
+    - name: Ejecutar script
       run: |
-        echo "Archivos generados:"
-        ls -la
-        echo ""
-        echo "Archivos .tar o .tgz encontrados:"
-        find . -maxdepth 1 -name "*.tar*" -o -name "*.tgz" -o -name "*.gz"
+        chmod +x monitoring-images-pull.sh
+        ./monitoring-images-pull.sh --save
     
-    - name: Identificar archivo comprimido
-      id: find_archive
+    - name: Verificar carpeta
       run: |
-        # Busca archivos .tar, .tgz, .tar.gz en el directorio actual
-        ARCHIVE=$(find . -maxdepth 1 -type f \( -name "*.tar" -o -name "*.tgz" -o -name "*.tar.gz" -o -name "*.gz" \) | head -1)
-        
-        if [ -z "$ARCHIVE" ]; then
-          echo "⚠️ No se encontró ningún archivo comprimido"
-          echo "archive_exists=false" >> $GITHUB_OUTPUT
-        else
-          ARCHIVE_NAME=$(basename "$ARCHIVE")
-          echo "✅ Archivo encontrado: $ARCHIVE_NAME"
-          echo "archive_exists=true" >> $GITHUB_OUTPUT
-          echo "archive_name=$ARCHIVE_NAME" >> $GITHUB_OUTPUT
-          echo "archive_path=$ARCHIVE" >> $GITHUB_OUTPUT
+        if [ ! -d "tar_monitoring" ]; then
+          echo "Error: No se encontró la carpeta tar_monitoring"
+          exit 1
         fi
+        echo "Contenido: $(ls tar_monitoring/)"
     
-    - name: Subir archivo como artifact
-      if: steps.find_archive.outputs.archive_exists == 'true'
+    - name: Comprimir carpeta
+      run: |
+        FECHA=$(date +'%Y%m%d_%H%M%S')
+        tar -czf "monitoring-images_${FECHA}.tar.gz" tar_monitoring/
+        echo "ARCHIVO=monitoring-images_${FECHA}.tar.gz" >> $GITHUB_ENV
+    
+    - name: Subir artifact
       uses: actions/upload-artifact@v4
       with:
-        name: imagenes-docker-${{ github.run_id }}${{ inputs.version && format('-{0}', inputs.version) || '' }}
-        path: ${{ steps.find_archive.outputs.archive_path }}
+        name: ${{ env.ARCHIVO }}
+        path: ${{ env.ARCHIVO }}
         retention-days: 7
-        compression-level: 0  # No comprimir nuevamente el artifact
-    
-    - name: Mostrar mensaje si no hay archivo
-      if: steps.find_archive.outputs.archive_exists == 'false'
-      run: |
-        echo "::error::No se encontró ningún archivo comprimido (.tar, .tgz, .tar.gz)"
-        echo "Verifica que tu script monitoring-images-pull.sh genere correctamente el archivo comprimido"
-        exit 1
