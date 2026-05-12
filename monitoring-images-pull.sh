@@ -51,8 +51,6 @@ IMAGES=(
   # --- node-exporter (sub-chart 4.51.1, app 1.10.2) ---
   quay.io/prometheus/node-exporter:v1.10.2
 
-  # --- windows-exporter (sub-chart 0.12.3, app 0.31.3) ---
-  ghcr.io/prometheus-community/windows-exporter:v0.31.3
 )
 
 echo "📦 Descargando ${#IMAGES[@]} imágenes para kube-prometheus-stack 81.6.1..."
